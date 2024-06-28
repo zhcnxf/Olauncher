@@ -3,7 +3,9 @@ package app.olauncher.ui
 import android.content.Context
 import android.os.UserHandle
 import android.text.Editable
+import android.text.SpannableStringBuilder
 import android.text.TextWatcher
+import android.text.style.AbsoluteSizeSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -167,7 +169,15 @@ class AppDrawerAdapter(
             with(binding) {
                 appHideLayout.visibility = View.GONE
                 renameLayout.visibility = View.GONE
-                appTitle.text = appModel.appLabel
+                appTitle.text =
+                    SpannableStringBuilder(appModel.appLabel + "\n" + appModel.appPackage).apply {
+                        setSpan(
+                            AbsoluteSizeSpan(12, true),
+                            appModel.appLabel.length,
+                            appModel.appLabel.length + appModel.appPackage.length + 1,
+                            SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE,
+                        )
+                    }
                 appTitle.gravity = appLabelGravity
                 otherProfileIndicator.isVisible = appModel.user != myUserHandle
 

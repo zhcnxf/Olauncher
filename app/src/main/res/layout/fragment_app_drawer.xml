@@ -23,6 +23,7 @@
             android:paddingHorizontal="3dp"
             android:paddingVertical="0dp"
             android:textCursorDrawable="@null"
+            android:inputType="textVisiblePassword"
             app:closeIcon="@null"
             app:iconifiedByDefault="false"
             app:queryBackground="@null"
