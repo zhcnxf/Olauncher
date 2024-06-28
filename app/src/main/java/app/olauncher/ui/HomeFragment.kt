@@ -52,7 +52,11 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -64,7 +68,8 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             ViewModelProvider(this)[MainViewModel::class.java]
         } ?: throw Exception("Invalid Activity")
 
-        deviceManager = context?.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        deviceManager =
+            context?.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
         vibrator = context?.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
         initObservers()
@@ -124,14 +129,46 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
 
     override fun onLongClick(view: View): Boolean {
         when (view.id) {
-            R.id.homeApp1 -> showAppList(Constants.FLAG_SET_HOME_APP_1, prefs.appName1.isNotEmpty(), true)
-            R.id.homeApp2 -> showAppList(Constants.FLAG_SET_HOME_APP_2, prefs.appName2.isNotEmpty(), true)
-            R.id.homeApp3 -> showAppList(Constants.FLAG_SET_HOME_APP_3, prefs.appName3.isNotEmpty(), true)
-            R.id.homeApp4 -> showAppList(Constants.FLAG_SET_HOME_APP_4, prefs.appName4.isNotEmpty(), true)
-            R.id.homeApp5 -> showAppList(Constants.FLAG_SET_HOME_APP_5, prefs.appName5.isNotEmpty(), true)
-            R.id.homeApp6 -> showAppList(Constants.FLAG_SET_HOME_APP_6, prefs.appName6.isNotEmpty(), true)
-            R.id.homeApp7 -> showAppList(Constants.FLAG_SET_HOME_APP_7, prefs.appName7.isNotEmpty(), true)
-            R.id.homeApp8 -> showAppList(Constants.FLAG_SET_HOME_APP_8, prefs.appName8.isNotEmpty(), true)
+            R.id.homeApp1 -> showAppList(
+                Constants.FLAG_SET_HOME_APP_1,
+                prefs.appName1.isNotEmpty(),
+                true
+            )
+            R.id.homeApp2 -> showAppList(
+                Constants.FLAG_SET_HOME_APP_2,
+                prefs.appName2.isNotEmpty(),
+                true
+            )
+            R.id.homeApp3 -> showAppList(
+                Constants.FLAG_SET_HOME_APP_3,
+                prefs.appName3.isNotEmpty(),
+                true
+            )
+            R.id.homeApp4 -> showAppList(
+                Constants.FLAG_SET_HOME_APP_4,
+                prefs.appName4.isNotEmpty(),
+                true
+            )
+            R.id.homeApp5 -> showAppList(
+                Constants.FLAG_SET_HOME_APP_5,
+                prefs.appName5.isNotEmpty(),
+                true
+            )
+            R.id.homeApp6 -> showAppList(
+                Constants.FLAG_SET_HOME_APP_6,
+                prefs.appName6.isNotEmpty(),
+                true
+            )
+            R.id.homeApp7 -> showAppList(
+                Constants.FLAG_SET_HOME_APP_7,
+                prefs.appName7.isNotEmpty(),
+                true
+            )
+            R.id.homeApp8 -> showAppList(
+                Constants.FLAG_SET_HOME_APP_8,
+                prefs.appName8.isNotEmpty(),
+                true
+            )
             R.id.clock -> {
                 showAppList(Constants.FLAG_SET_CLOCK_APP)
                 prefs.clockAppPackage = ""
@@ -202,7 +239,8 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     }
 
     private fun setHomeAlignment(horizontalGravity: Int = prefs.homeAlignment) {
-        val verticalGravity = if (prefs.homeBottomAlignment) Gravity.BOTTOM else Gravity.CENTER_VERTICAL
+        val verticalGravity =
+            if (prefs.homeBottomAlignment) Gravity.BOTTOM else Gravity.CENTER_VERTICAL
         binding.homeAppsLayout.gravity = horizontalGravity or verticalGravity
         binding.dateTimeLayout.gravity = horizontalGravity
         binding.homeApp1.gravity = horizontalGravity
@@ -225,8 +263,9 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         var dateText = dateFormat.format(Date())
 
         if (!prefs.showStatusBar) {
-            val battery = (requireContext().getSystemService(Context.BATTERY_SERVICE) as BatteryManager)
-                .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            val battery =
+                (requireContext().getSystemService(Context.BATTERY_SERVICE) as BatteryManager)
+                    .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
             if (battery > 0)
                 dateText = getString(R.string.day_battery, dateText, battery)
         }
@@ -296,7 +335,12 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         }
     }
 
-    private fun setHomeAppText(textView: TextView, appName: String, packageName: String, userString: String): Boolean {
+    private fun setHomeAppText(
+        textView: TextView,
+        appName: String,
+        packageName: String,
+        userString: String,
+    ): Boolean {
         if (isPackageInstalled(requireContext(), packageName, userString)) {
             textView.text = appName
             return true
@@ -326,10 +370,15 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         )
     }
 
-    private fun launchApp(appName: String, packageName: String, activityClassName: String?, userString: String) {
+    private fun launchApp(
+        appName: String,
+        packageName: String,
+        activityClassName: String?,
+        userString: String,
+    ) {
         viewModel.selectedApp(
             AppModel(
-                appName,
+                listOf(appName),
                 null,
                 packageName,
                 activityClassName,
@@ -339,7 +388,11 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         )
     }
 
-    private fun showAppList(flag: Int, rename: Boolean = false, includeHiddenApps: Boolean = false) {
+    private fun showAppList(
+        flag: Int,
+        rename: Boolean = false,
+        includeHiddenApps: Boolean = false,
+    ) {
         viewModel.getAppList(includeHiddenApps)
         try {
             findNavController().navigate(
@@ -397,10 +450,16 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             try {
                 deviceManager.lockNow()
             } catch (e: SecurityException) {
-                requireContext().showToast(getString(R.string.please_turn_on_double_tap_to_unlock), Toast.LENGTH_LONG)
+                requireContext().showToast(
+                    getString(R.string.please_turn_on_double_tap_to_unlock),
+                    Toast.LENGTH_LONG
+                )
                 findNavController().navigate(R.id.action_mainFragment_to_settingsFragment)
             } catch (e: Exception) {
-                requireContext().showToast(getString(R.string.launcher_failed_to_lock_device), Toast.LENGTH_LONG)
+                requireContext().showToast(
+                    getString(R.string.launcher_failed_to_lock_device),
+                    Toast.LENGTH_LONG
+                )
                 prefs.lockModeOn = false
             }
         }
@@ -412,7 +471,8 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         else
             @Suppress("DEPRECATION", "InlinedApi")
             requireActivity().window.decorView.apply {
-                systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                systemUiVisibility =
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
             }
     }
 
@@ -438,7 +498,8 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         requireActivity().recreate()
     }
 
-    private fun showLongPressToast() = requireContext().showToast(getString(R.string.long_press_to_select_app))
+    private fun showLongPressToast() =
+        requireContext().showToast(getString(R.string.long_press_to_select_app))
 
     private fun textOnClick(view: View) = onClick(view)
 

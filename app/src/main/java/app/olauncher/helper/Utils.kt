@@ -5,12 +5,10 @@ import android.app.SearchManager
 import android.app.WallpaperManager
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import android.graphics.Bitmap
@@ -42,9 +40,6 @@ import app.olauncher.R
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -53,6 +48,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.Scanner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import net.sourceforge.pinyin4j.PinyinHelper
+import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType
+import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat
+import net.sourceforge.pinyin4j.format.HanyuPinyinToneType
+import org.json.JSONObject
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -65,7 +67,12 @@ fun Context.showToast(stringResource: Int, duration: Int = Toast.LENGTH_SHORT) {
     Toast.makeText(this, getString(stringResource), duration).show()
 }
 
-suspend fun getAppsList(context: Context, prefs: Prefs, includeRegularApps: Boolean = true, includeHiddenApps: Boolean = false): MutableList<AppModel> {
+suspend fun getAppsList(
+    context: Context,
+    prefs: Prefs,
+    includeRegularApps: Boolean = true,
+    includeHiddenApps: Boolean = false,
+): MutableList<AppModel> {
     return withContext(Dispatchers.IO) {
         val appList: MutableList<AppModel> = mutableListOf()
 
@@ -74,15 +81,69 @@ suspend fun getAppsList(context: Context, prefs: Prefs, includeRegularApps: Bool
             val hiddenApps = Prefs(context).hiddenApps
 
             val userManager = context.getSystemService(Context.USER_SERVICE) as UserManager
-            val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+            val launcherApps =
+                context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
             val collator = Collator.getInstance()
 
             for (profile in userManager.userProfiles) {
                 for (app in launcherApps.getActivityList(null, profile)) {
+                    val labels =
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            val locales = context.resources.configuration.locales
+                            mutableListOf<String>().apply {
+                                for (i in 0 until locales.size()) {
+                                    val locale = locales[i]
+                                    val labelRes =
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            app.activityInfo.labelRes.takeIf { it != 0 }
+                                                ?: app.applicationInfo.labelRes
+                                        } else {
+                                            app.applicationInfo.labelRes
+                                        }
+                                    val packageContext = context.createPackageContext(
+                                        app.applicationInfo.packageName,
+                                        0
+                                    )
+                                    val label =
+                                        if (labelRes == 0) {
+                                            app.label.toString()
+                                        } else {
+                                            packageContext.createConfigurationContext(
+                                                Configuration(context.resources.configuration).apply {
+                                                    setLocale(locale)
+                                                }
+                                            ).resources.getString(labelRes)
+                                        }
+                                    add(label)
+                                    if (locale.language == Locale.CHINA.language) {
+                                        add(label.toPinyinString())
+                                    }
+                                }
+                            }
+                        } else {
+                            mutableListOf(app.label.toString())
+                        }
 
-                    val appLabelShown = prefs.getAppRenameLabel(app.applicationInfo.packageName).ifBlank { app.label.toString() }
+                    // First character of each word in the app label
+                    labels.map { label ->
+                        label.split(" ").mapNotNull {
+                            it.firstOrNull()?.uppercaseChar()?.toString()
+                        }.joinToString("")
+                    }.apply {
+                        labels.addAll(this)
+                    }
+
+                    val appLabelShown = prefs.getAppRenameLabel(app.applicationInfo.packageName)
+                        .ifBlank { app.label.toString() }
+                    val appLabels = (listOf(appLabelShown) + labels).distinct()
+                    if (BuildConfig.DEBUG) {
+                        Log.d(
+                            "AppLabels",
+                            app.applicationInfo.packageName + ": " + appLabels.joinToString()
+                        )
+                    }
                     val appModel = AppModel(
-                        appLabelShown,
+                        appLabels,
                         collator.getCollationKey(app.label.toString()),
                         app.applicationInfo.packageName,
                         app.componentName.className,
@@ -129,7 +190,8 @@ private fun upgradeHiddenApps(prefs: Prefs) {
 
 fun isPackageInstalled(context: Context, packageName: String, userString: String): Boolean {
     val launcher = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-    val activityInfo = launcher.getActivityList(packageName, getUserHandleFromString(context, userString))
+    val activityInfo =
+        launcher.getActivityList(packageName, getUserHandleFromString(context, userString))
     if (activityInfo.size > 0) return true
     return false
 }
@@ -397,13 +459,20 @@ fun openCalendar(context: Context) {
 
 fun isAccessServiceEnabled(context: Context): Boolean {
     val enabled = try {
-        Settings.Secure.getInt(context.applicationContext.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED)
+        Settings.Secure.getInt(
+            context.applicationContext.contentResolver,
+            Settings.Secure.ACCESSIBILITY_ENABLED
+        )
     } catch (e: Exception) {
         0
     }
     if (enabled == 1) {
-        val enabledServicesString: String? = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-        return enabledServicesString?.contains(context.packageName + "/" + MyAccessibilityService::class.java.name) ?: false
+        val enabledServicesString: String? = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        )
+        return enabledServicesString?.contains(context.packageName + "/" + MyAccessibilityService::class.java.name)
+            ?: false
     }
     return false
 }
@@ -497,4 +566,22 @@ fun Context.rateApp() {
     flags = flags or Intent.FLAG_ACTIVITY_NEW_DOCUMENT
     intent.addFlags(flags)
     startActivity(intent)
+}
+
+// No tone no case
+val pinyinFormat = HanyuPinyinOutputFormat().apply {
+    toneType = HanyuPinyinToneType.WITHOUT_TONE
+    caseType = HanyuPinyinCaseType.LOWERCASE
+}
+
+fun String.toPinyinString(): String {
+    if (isEmpty()) return this
+    return this.toCharArray().joinToString(" ") { c ->
+        PinyinHelper.toHanyuPinyinStringArray(c, pinyinFormat)?.firstOrNull()
+            ?.takeIf {
+                it.length > 1 || (it.isNotEmpty() && it[0] != c.lowercaseChar())
+            }?.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString()
+            } ?: c.toString()
+    }
 }
