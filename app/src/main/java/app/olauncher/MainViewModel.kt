@@ -8,20 +8,17 @@ import android.os.UserHandle
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import androidx.work.BackoffPolicy
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
+import androidx.work.*
 import app.olauncher.data.AppModel
 import app.olauncher.data.Constants
 import app.olauncher.data.Prefs
-import app.olauncher.helper.SingleLiveEvent
-import app.olauncher.helper.WallpaperWorker
-import app.olauncher.helper.getAppsList
-import app.olauncher.helper.isOlauncherDefault
-import app.olauncher.helper.showToast
+import app.olauncher.helper.*
+import app.roomdatabase.AppHistory
+import app.roomdatabase.AppHistoryDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -42,6 +39,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val showDialog = SingleLiveEvent<String>()
     val checkForMessages = SingleLiveEvent<Unit?>()
     val resetLauncherLiveData = SingleLiveEvent<Unit?>()
+    private val appHistoryDao by lazy {
+        AppHistoryDatabase.getDatabase(appContext).appHistoryDao()
+    }
 
     fun selectedApp(appModel: AppModel, flag: Int) {
         when (flag) {
@@ -193,17 +193,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             appContext.showToast(appContext.getString(R.string.unable_to_open_app))
         }
+        viewModelScope.launch(Dispatchers.IO) {
+            appHistoryDao.upsert(
+                AppHistory(
+                    packageName,
+                    activityClassName ?: "",
+                    System.currentTimeMillis()
+                )
+            )
+        }
     }
 
     fun getAppList(includeHiddenApps: Boolean = false) {
-        viewModelScope.launch {
-            appList.value = getAppsList(appContext, prefs, includeRegularApps = true, includeHiddenApps)
+        viewModelScope.launch(Dispatchers.IO) {
+            combine(
+                flow {
+                    emit(
+                        getAppsList(
+                            appContext,
+                            prefs,
+                            includeRegularApps = true,
+                            includeHiddenApps
+                        )
+                    )
+                },
+                appHistoryDao.getAppHistoryFlow(),
+            ) { appList, appHistory ->
+                val appHistoryMap = appHistory.associateBy { it.packageName }
+                appList.forEach {
+                    it.lastOpened = appHistoryMap[it.appPackage]?.lastOpened ?: 0
+                }
+                appList.sorted()
+            }.collectLatest {
+                appList.postValue(it)
+            }
         }
     }
 
     fun getHiddenApps() {
         viewModelScope.launch {
-            hiddenApps.value = getAppsList(appContext, prefs, includeRegularApps = false, includeHiddenApps = true)
+            hiddenApps.value =
+                getAppsList(appContext, prefs, includeRegularApps = false, includeHiddenApps = true)
         }
     }
 

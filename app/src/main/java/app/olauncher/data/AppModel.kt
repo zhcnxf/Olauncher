@@ -13,8 +13,12 @@ data class AppModel(
 
     val appLabel: String get() = appLabels.first()
 
-    override fun compareTo(other: AppModel): Int = when {
-        key != null && other.key != null -> key.compareTo(other.key)
-        else -> appLabel.compareTo(other.appLabel, true)
-    }
+    var lastOpened: Long = 0
+
+    override fun compareTo(other: AppModel): Int =
+        lastOpened.compareTo(other.lastOpened).takeIf { it != 0 }?.let { -it }
+            ?: when {
+                key != null && other.key != null -> key.compareTo(other.key)
+                else -> appLabel.compareTo(other.appLabel, true)
+            }
 }
